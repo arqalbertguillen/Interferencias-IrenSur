@@ -4,41 +4,27 @@ import plotly.express as px
 from datetime import datetime
 import io
 import streamlit.components.v1 as components
+import glob
+import os
 
 st.set_page_config(page_title="Dashboard BIM - IREN SUR", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    /* Fondo principal y textos */
     .stApp { background-color: #1b202b; color: #e2e8f0; }
-    
-    /* Contenedor del Encabezado */
     .header-container { background-color: #242b38; padding: 20px 30px; border-radius: 8px; border: 1px solid #f7931e; margin-bottom: 25px; }
     .header-top-text { color: #f7931e; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px; }
     .header-title { color: #ffffff; font-size: 32px; font-weight: 800; margin-bottom: 0px; display: flex; align-items: center; }
     .badge { background-color: #2d88ff; color: white; font-size: 14px; padding: 4px 10px; border-radius: 6px; margin-left: 15px; font-weight: bold; }
     .header-subtitle { color: #94a3b8; font-size: 15px; margin-top: 5px; margin-bottom: 20px; }
-    
-    /* Metadatos del Encabezado */
     .meta-grid { display: flex; justify-content: space-between; border-top: 1px solid #334155; padding-top: 15px; }
     .meta-box { display: flex; flex-direction: column; }
     .meta-title { color: #64748b; font-size: 11px; font-weight: bold; margin-bottom: 3px; text-transform: uppercase; }
     .meta-value { color: #f8fafc; font-size: 14px; font-weight: 600; }
-    
-    /* Títulos secundarios y Métricas */
+    .chart-container { background-color: #242b38; padding: 20px; border-radius: 10px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; height: 100%; }
     h1, h2, h3, h4 { color: #f7931e !important; }
     div[data-testid="stMetricValue"] { color: #ffffff; }
     div[data-testid="stMetricLabel"] { color: #94a3b8; }
-    
-    /* Marcos Naranjas para los Gráficos */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        border: 1px solid #f7931e !important;
-        border-radius: 8px !important;
-        background-color: #242b38 !important;
-        padding: 10px;
-    }
-    
-    /* Modo Impresión (PDF Limpio) */
     @media print { 
         header, footer { display: none !important; } 
         section[data-testid="stSidebar"] { display: none !important; }
@@ -118,19 +104,31 @@ with st.sidebar:
         </button>
     """, height=50)
 
-uploaded_files = st.file_uploader("Sube tus reportes maestros de Navisworks (.xlsx)", type=['xlsx'], accept_multiple_files=True)
+# Interfaz para revisión interna
+uploaded_files = st.file_uploader("📂 [Revisión Interna] Arrastra Excels aquí para previsualizar. Si se deja vacío, cargarán los Datos de la Nube.", type=['xlsx'], accept_multiple_files=True)
+
+# Lógica Híbrida Inteligente
+archivos_a_procesar = []
+origen_datos = ""
 
 if uploaded_files:
-    num_archivos = len(uploaded_files)
-    version_str = f"V{num_archivos - 1:02d}"
+    archivos_a_procesar = uploaded_files
+    origen_datos = "Archivos Locales (Previsualización)"
+else:
+    archivos_a_procesar = sorted(glob.glob("*.xlsx"))
+    origen_datos = "Datos de la Nube"
+
+if archivos_a_procesar:
+    num_archivos = len(archivos_a_procesar)
+    version_str = f"V{num_archivos:02d}"
 
     all_dfs = []
-    for f in uploaded_files:
+    for f in archivos_a_procesar:
         df_part = load_data(f)
         all_dfs.append(df_part)
     df_timeline = pd.concat(all_dfs, ignore_index=True)
     
-    ultimo_archivo = uploaded_files[-1]
+    ultimo_archivo = archivos_a_procesar[-1]
     df_dashboard = load_data(ultimo_archivo)
 
     fecha_hoy = datetime.now().strftime("%d/%m/%Y")
@@ -141,7 +139,8 @@ if uploaded_files:
         <div class="header-subtitle">Dashboard de Control Gerencial — Seguimiento de Interferencias</div>
         <div class="meta-grid">
             <div class="meta-box"><span class="meta-title">ELABORADO POR</span><span class="meta-value">Coord. BIM Diseño • Albert Guillen</span></div>
-            <div class="meta-box"><span class="meta-title">VALIDADO POR</span><span class="meta-value">Jhonathan Seminario</span></div>
+            <div class="meta-box"><span class="meta-title">VALIDADO POR</span><span class="meta-value">KP-07 • Jhonathan Seminario</span></div>
+            <div class="meta-box"><span class="meta-title">ORIGEN DE DATOS</span><span class="meta-value" style="color:#4ade80;">{origen_datos}</span></div>
             <div class="meta-box"><span class="meta-title">FECHA DE CORRIDA</span><span class="meta-value">{fecha_hoy}</span></div>
         </div>
     </div>
@@ -234,7 +233,7 @@ if uploaded_files:
                     try: styled_lista = lista_clashes.style.map(color_semaforo_lista, subset=['Total / Resueltos'])
                     except AttributeError: styled_lista = lista_clashes.style.applymap(color_semaforo_lista, subset=['Total / Resueltos'])
                     
-                    # TABLA CON SCROLL (Altura por defecto de Streamlit)
+                    # TABLA CON SCROLL NATIVO
                     st.dataframe(styled_lista, use_container_width=True, hide_index=True)
                     
                     buffer = io.BytesIO()
@@ -243,7 +242,6 @@ if uploaded_files:
 
                     st.markdown("---")
                     
-                    # GRÁFICOS CON MARCO NATIVO
                     c1, c2 = st.columns(2)
                     with c1:
                         with st.container(border=True):
@@ -310,3 +308,5 @@ if uploaded_files:
                 cols_to_show = [c for c in ['Test', 'Nombre de conflicto', estado_col, 'ID de elemento', c_zo, c_ni, c_am] if c in df_dash_filt.columns]
                 if not cols_to_show: cols_to_show = df_dash_filt.columns
                 st.dataframe(df_dash_filt[cols_to_show], use_container_width=True)
+else:
+    st.info("No se encontraron archivos de Navisworks. Sube los reportes desde la interfaz o al repositorio en la nube.")

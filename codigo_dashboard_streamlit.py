@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import io
 import streamlit.components.v1 as components
 import glob
@@ -131,7 +131,8 @@ if archivos_a_procesar:
     ultimo_archivo = archivos_a_procesar[-1]
     df_dashboard = load_data(ultimo_archivo)
 
-    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+    zona_peru = timezone(timedelta(hours=-5))
+fecha_hoy = datetime.now(zona_peru).strftime("%d/%m/%Y")
     st.markdown(f"""
     <div class="header-container">
         <div class="header-top-text">GESTIÓN BIM • CONTROL DE DISEÑO</div>

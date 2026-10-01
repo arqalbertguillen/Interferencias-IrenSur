@@ -131,8 +131,10 @@ if archivos_a_procesar:
     ultimo_archivo = archivos_a_procesar[-1]
     df_dashboard = load_data(ultimo_archivo)
 
+    # Cálculo de fecha ajustado a la zona horaria de Perú (UTC-5)
     zona_peru = timezone(timedelta(hours=-5))
-fecha_hoy = datetime.now(zona_peru).strftime("%d/%m/%Y")
+    fecha_hoy = datetime.now(zona_peru).strftime("%d/%m/%Y")
+    
     st.markdown(f"""
     <div class="header-container">
         <div class="header-top-text">GESTIÓN BIM • CONTROL DE DISEÑO</div>
@@ -234,7 +236,6 @@ fecha_hoy = datetime.now(zona_peru).strftime("%d/%m/%Y")
                     try: styled_lista = lista_clashes.style.map(color_semaforo_lista, subset=['Total / Resueltos'])
                     except AttributeError: styled_lista = lista_clashes.style.applymap(color_semaforo_lista, subset=['Total / Resueltos'])
                     
-                    # TABLA CON SCROLL NATIVO
                     st.dataframe(styled_lista, use_container_width=True, hide_index=True)
                     
                     buffer = io.BytesIO()

@@ -26,6 +26,12 @@ st.markdown("""
     div[data-testid="stMetricValue"] { color: #ffffff; }
     div[data-testid="stMetricLabel"] { color: #94a3b8; }
     
+    /* Esta clase generará el salto de página en la impresión */
+    .page-break {
+        page-break-before: always;
+        break-before: page;
+    }
+    
     @media print { 
         header, footer { display: none !important; } 
         section[data-testid="stSidebar"] { display: none !important; }
@@ -40,7 +46,6 @@ st.markdown("""
         .header-container { background-color: white !important; border: 2px solid black !important; }
         .header-title, .header-subtitle, .meta-title, .meta-value, .header-top-text { color: black !important; }
         
-        /* NUEVAS REGLAS: Fuerzan a la web a expandirse completa hacia abajo para el PDF */
         html, body, .stApp, .main, .block-container, div[data-testid="stVerticalBlock"], div[data-testid="stTabs"], div[role="tabpanel"] {
             height: auto !important;
             overflow: visible !important;
@@ -229,7 +234,6 @@ if archivos_a_procesar:
                 if tot > 0:
                     st.markdown("---")
                     
-                    # 1. PRIMERO PROCESAMOS LA DATA
                     df_dash_filt['Es_Resuelto'] = df_dash_filt[estado_col].isin(['Resuelto', 'Aprobado'])
                     agrupado = df_dash_filt.groupby(['Test', 'Tolerancia_Grupo']).agg(Total=('Test', 'count'), Resueltos=('Es_Resuelto', 'sum')).reset_index()
                     agrupado['Orden_CL'] = agrupado['Test'].apply(lambda x: 1 if "(CL)" in str(x) else 0)
@@ -237,10 +241,8 @@ if archivos_a_procesar:
                     agrupado['Total / Resueltos'] = agrupado['Total'].astype(str) + " / " + agrupado['Resueltos'].astype(str)
                     lista_clashes = agrupado[['Test', 'Tolerancia_Grupo', 'Total / Resueltos']].rename(columns={'Test': 'Grupo de Clash (VS)', 'Tolerancia_Grupo': 'Tolerancia'})
                     
-                    # 2. CALCULAMOS EL NÚMERO DE GRUPOS
                     num_grupos = len(agrupado)
                     
-                    # 3. LUEGO IMPRIMIMOS EL TÍTULO CON EL NÚMERO
                     st.markdown(f"### 📋 Lista de Interferencias &nbsp;<span style='font-size:16px; color:#f7931e; background-color:rgba(247,147,30,0.1); padding:4px 10px; border-radius:6px; vertical-align: middle;'>{num_grupos} Grupos</span>", unsafe_allow_html=True)
                     
                     def color_semaforo_lista(val):
@@ -254,6 +256,7 @@ if archivos_a_procesar:
                             else: return 'background-color: rgba(239, 68, 68, 0.2); color: #f87171; font-weight: bold; text-align: center;'
                         except: return ''
                     
+                    # 1. SOLUCIÓN AL ÍNDICE: hide(axis="index") elimina la numeración izquierda
                     try: 
                         styled_lista = lista_clashes.style.hide(axis='index').map(color_semaforo_lista, subset=['Total / Resueltos'])
                     except AttributeError: 
@@ -266,6 +269,9 @@ if archivos_a_procesar:
                     st.download_button("📥 Descargar Tabla en Excel", data=buffer.getvalue(), file_name="Lista_Interferencias.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
                     st.markdown("---")
+                    
+                    # 2. SOLUCIÓN AL SALTO DE PÁGINA: Agregamos un div invisible antes de los gráficos
+                    st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
                     
                     c1, c2 = st.columns(2)
                     with c1:
@@ -332,6 +338,8 @@ if archivos_a_procesar:
                 st.markdown("### 🔎 Detalle de Clashes e IDs")
                 cols_to_show = [c for c in ['Test', 'Nombre de conflicto', estado_col, 'ID de elemento', c_zo, c_ni, c_am] if c in df_dash_filt.columns]
                 if not cols_to_show: cols_to_show = df_dash_filt.columns
-                st.dataframe(df_dash_filt[cols_to_show], use_container_width=True)
+                
+                # Aprovechamos para ocultar el índice también en esta tabla
+                st.dataframe(df_dash_filt[cols_to_show], use_container_width=True, hide_index=True)
 else:
     st.info("No se encontraron archivos de Navisworks. Sube los reportes desde la interfaz o al repositorio en la nube.")

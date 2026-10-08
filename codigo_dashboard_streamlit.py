@@ -25,12 +25,16 @@ st.markdown("""
     h1, h2, h3, h4 { color: #f7931e !important; }
     div[data-testid="stMetricValue"] { color: #ffffff; }
     div[data-testid="stMetricLabel"] { color: #94a3b8; }
+    
     @media print { 
         header, footer { display: none !important; } 
         section[data-testid="stSidebar"] { display: none !important; }
         div[data-testid="stFileUploader"] { display: none !important; }
         div[data-testid="stAlert"] { display: none !important; }
         button { display: none !important; }
+        div[data-testid="stMultiSelect"] { display: none !important; } /* Oculta los desplegables de filtros */
+        div[role="tablist"] { display: none !important; } /* Oculta los botones de las pestañas */
+        .hide-print { display: none !important; } /* Oculta textos específicos */
         .stApp { background-color: white !important; } 
         * { color: black !important; } 
         .header-container { background-color: white !important; border: 2px solid black !important; }
@@ -159,7 +163,9 @@ if archivos_a_procesar:
             if estado_col in df_timeline.columns:
                 df_timeline[estado_col] = df_timeline[estado_col].astype(str).str.strip()
             
-            st.markdown("### 🔍 Filtros del Proyecto")
+            # TEXTO DE FILTROS OCULTO EN IMPRESIÓN
+            st.markdown('<h3 class="hide-print">🔍 Filtros del Proyecto</h3>', unsafe_allow_html=True)
+            
             c_ed = next((col for col in df_dashboard.columns if 'edificio' in str(col).lower()), None)
             c_ni = next((col for col in df_dashboard.columns if 'nivel' in str(col).lower()), None)
             c_zo = next((col for col in df_dashboard.columns if 'zona' in str(col).lower()), None)

@@ -26,7 +26,6 @@ st.markdown("""
     div[data-testid="stMetricValue"] { color: #ffffff; }
     div[data-testid="stMetricLabel"] { color: #94a3b8; }
     
-    /* Esta clase generará el salto de página en la impresión */
     .page-break {
         page-break-before: always;
         break-before: page;
@@ -56,8 +55,10 @@ st.markdown("""
             border: 1px solid #ccc !important; background-color: white !important; 
             height: auto !important; overflow: visible !important; display: block !important;
         }
-        table { page-break-inside: auto !important; }
+        table { page-break-inside: auto !important; width: 100% !important; }
         tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+        /* Fuerza a que la columna de Grupo ocupe más espacio al imprimir */
+        td:nth-child(2) { width: 60% !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -239,13 +240,10 @@ if archivos_a_procesar:
                     agrupado['Orden_CL'] = agrupado['Test'].apply(lambda x: 1 if "(CL)" in str(x) else 0)
                     agrupado = agrupado.sort_values(by=['Orden_CL', 'Test']).drop(columns=['Orden_CL'])
                     
-                    # AQUÍ ESTÁ LA LÍNEA QUE SE HABÍA BORRADO
                     agrupado['Total / Resueltos'] = agrupado['Total'].astype(str) + " / " + agrupado['Resueltos'].astype(str)
                     
-                    # 1. Creamos la tabla final renombrando columnas
                     lista_clashes = agrupado[['Test', 'Tolerancia_Grupo', 'Total / Resueltos']].rename(columns={'Test': 'Grupo de Clash (VS)', 'Tolerancia_Grupo': 'Tolerancia'})
                     
-                    # 2. Agregamos una columna dedicada "N°" que arranca desde el 1
                     lista_clashes.insert(0, 'N°', range(1, len(lista_clashes) + 1))
                     
                     num_grupos = len(agrupado)
@@ -263,12 +261,11 @@ if archivos_a_procesar:
                             else: return 'background-color: rgba(239, 68, 68, 0.2); color: #f87171; font-weight: bold; text-align: center;'
                         except: return ''
                     
-                    try: 
-                        styled_lista = lista_clashes.style.hide(axis='index').map(color_semaforo_lista, subset=['Total / Resueltos'])
-                    except AttributeError: 
-                        styled_lista = lista_clashes.style.hide_index().applymap(color_semaforo_lista, subset=['Total / Resueltos'])
+                    # ELIMINAMOS LA DOBLE NUMERACIÓN con hide_index=True directamente al dibujar la tabla
+                    styled_lista = lista_clashes.style.map(color_semaforo_lista, subset=['Total / Resueltos']) if hasattr(lista_clashes.style, 'map') else lista_clashes.style.applymap(color_semaforo_lista, subset=['Total / Resueltos'])
                     
-                    st.table(styled_lista)
+                    # Se incluye el parámetro hide_index=True para asegurar que el índice no se muestre nunca
+                    st.dataframe(styled_lista, use_container_width=True, hide_index=True)
                     
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer: lista_clashes.to_excel(writer, sheet_name='Lista', index=False)

@@ -32,14 +32,27 @@ st.markdown("""
         div[data-testid="stFileUploader"] { display: none !important; }
         div[data-testid="stAlert"] { display: none !important; }
         button { display: none !important; }
-        div[data-testid="stMultiSelect"] { display: none !important; } /* Oculta los desplegables de filtros */
-        div[role="tablist"] { display: none !important; } /* Oculta los botones de las pestañas */
-        .hide-print { display: none !important; } /* Oculta textos específicos */
+        div[data-testid="stMultiSelect"] { display: none !important; }
+        div[role="tablist"] { display: none !important; } 
+        .hide-print { display: none !important; } 
         .stApp { background-color: white !important; } 
         * { color: black !important; } 
         .header-container { background-color: white !important; border: 2px solid black !important; }
         .header-title, .header-subtitle, .meta-title, .meta-value, .header-top-text { color: black !important; }
-        div[data-testid="stVerticalBlockBorderWrapper"] { border: 1px solid #ccc !important; background-color: white !important; break-inside: avoid; page-break-inside: avoid; }
+        
+        /* NUEVAS REGLAS: Fuerzan a la web a expandirse completa hacia abajo para el PDF */
+        html, body, .stApp, .main, .block-container, div[data-testid="stVerticalBlock"], div[data-testid="stTabs"], div[role="tabpanel"] {
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+            position: relative !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"] { 
+            border: 1px solid #ccc !important; background-color: white !important; 
+            height: auto !important; overflow: visible !important; display: block !important;
+        }
+        table { page-break-inside: auto !important; }
+        tr { page-break-inside: avoid !important; page-break-after: auto !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -108,10 +121,8 @@ with st.sidebar:
         </button>
     """, height=50)
 
-# Interfaz para revisión interna
 uploaded_files = st.file_uploader("📂 [Revisión Interna] Arrastra Excels aquí para previsualizar. Si se deja vacío, cargarán los Datos de la Nube.", type=['xlsx'], accept_multiple_files=True)
 
-# Lógica Híbrida Inteligente
 archivos_a_procesar = []
 origen_datos = ""
 
@@ -135,7 +146,6 @@ if archivos_a_procesar:
     ultimo_archivo = archivos_a_procesar[-1]
     df_dashboard = load_data(ultimo_archivo)
 
-    # Cálculo de fecha ajustado a la zona horaria de Perú (UTC-5)
     zona_peru = timezone(timedelta(hours=-5))
     fecha_hoy = datetime.now(zona_peru).strftime("%d/%m/%Y")
     
@@ -163,7 +173,6 @@ if archivos_a_procesar:
             if estado_col in df_timeline.columns:
                 df_timeline[estado_col] = df_timeline[estado_col].astype(str).str.strip()
             
-            # TEXTO DE FILTROS OCULTO EN IMPRESIÓN
             st.markdown('<h3 class="hide-print">🔍 Filtros del Proyecto</h3>', unsafe_allow_html=True)
             
             c_ed = next((col for col in df_dashboard.columns if 'edificio' in str(col).lower()), None)
@@ -219,14 +228,20 @@ if archivos_a_procesar:
                 
                 if tot > 0:
                     st.markdown("---")
-                    st.markdown("### 📋 Lista de Interferencias")
-                    df_dash_filt['Es_Resuelto'] = df_dash_filt[estado_col].isin(['Resuelto', 'Aprobado'])
                     
+                    # 1. PRIMERO PROCESAMOS LA DATA
+                    df_dash_filt['Es_Resuelto'] = df_dash_filt[estado_col].isin(['Resuelto', 'Aprobado'])
                     agrupado = df_dash_filt.groupby(['Test', 'Tolerancia_Grupo']).agg(Total=('Test', 'count'), Resueltos=('Es_Resuelto', 'sum')).reset_index()
                     agrupado['Orden_CL'] = agrupado['Test'].apply(lambda x: 1 if "(CL)" in str(x) else 0)
                     agrupado = agrupado.sort_values(by=['Orden_CL', 'Test']).drop(columns=['Orden_CL'])
                     agrupado['Total / Resueltos'] = agrupado['Total'].astype(str) + " / " + agrupado['Resueltos'].astype(str)
                     lista_clashes = agrupado[['Test', 'Tolerancia_Grupo', 'Total / Resueltos']].rename(columns={'Test': 'Grupo de Clash (VS)', 'Tolerancia_Grupo': 'Tolerancia'})
+                    
+                    # 2. CALCULAMOS EL NÚMERO DE GRUPOS
+                    num_grupos = len(agrupado)
+                    
+                    # 3. LUEGO IMPRIMIMOS EL TÍTULO CON EL NÚMERO
+                    st.markdown(f"### 📋 Lista de Interferencias &nbsp;<span style='font-size:16px; color:#f7931e; background-color:rgba(247,147,30,0.1); padding:4px 10px; border-radius:6px; vertical-align: middle;'>{num_grupos} Grupos</span>", unsafe_allow_html=True)
                     
                     def color_semaforo_lista(val):
                         try:
@@ -239,10 +254,12 @@ if archivos_a_procesar:
                             else: return 'background-color: rgba(239, 68, 68, 0.2); color: #f87171; font-weight: bold; text-align: center;'
                         except: return ''
                     
-                    try: styled_lista = lista_clashes.style.map(color_semaforo_lista, subset=['Total / Resueltos'])
-                    except AttributeError: styled_lista = lista_clashes.style.applymap(color_semaforo_lista, subset=['Total / Resueltos'])
+                    try: 
+                        styled_lista = lista_clashes.style.hide(axis='index').map(color_semaforo_lista, subset=['Total / Resueltos'])
+                    except AttributeError: 
+                        styled_lista = lista_clashes.style.hide_index().applymap(color_semaforo_lista, subset=['Total / Resueltos'])
                     
-                    st.dataframe(styled_lista, use_container_width=True, hide_index=True)
+                    st.table(styled_lista)
                     
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer: lista_clashes.to_excel(writer, sheet_name='Lista', index=False)
